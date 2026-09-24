@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ============================================================================
-   SBK Store Inspect — ระบบบันทึกการตรวจร้านค้า & แดชบอร์ดสรุปผล   SCI_Form_v8.html v8.0 — แอปฟอร์มบันทึกการตรวจ (เบา เปิดเร็ว) · โทนเขียวมรกต
+   SBK Store Inspect — ระบบบันทึกการตรวจร้านค้า & แดชบอร์ดสรุปผล   SCI_Form_v9.html v9.0 — แอปฟอร์มบันทึกการตรวจ (เบา เปิดเร็ว) · โทนเขียวมรกต
    v4.0: แดชบอร์ดโฉมใหม่ 3 แท็บ (ภาพรวม / รายงานรายวัน / ประวัติ), รายงานประจำวัน (LINE + A4),
          เชื่อมต่อทนทานขึ้น (retry, fetch→JSONP สำรอง, แคช, Outbox ออฟไลน์, รีเฟรชอัตโนมัติ)
    v3.0: รายชื่อผู้ตรวจ, ชั้น/โซน, ตัด GPS, ฝัง URL Web App, ใบรายงาน LINE (ดูตัวอย่างก่อนบันทึก,
@@ -423,6 +423,11 @@ html[data-theme="dark"]{--primary:#34d399;--primary-600:#6ee7b7;--primary-soft:#
             <input id="fStore" class="input input-hero" list="storeList" maxlength="200" autocomplete="off" placeholder="ระบุชื่อร้านค้าหรือสถานที่">
             <datalist id="storeList"></datalist>
           </div>
+          <div>
+            <label class="label mb-1.5" for="fShift"><span data-icon="clock"></span>รอบการตรวจ <span style="color:var(--danger)">*</span></label>
+            <select id="fShift" class="input"></select>
+            <div class="text-xs muted mt-1" id="fShiftHint"></div>
+          </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="label mb-1.5" for="fFloor"><span data-icon="layers"></span>ชั้น <span style="color:var(--danger)">*</span></label>
@@ -577,6 +582,12 @@ const CONFIG = {
     'นาย สุนทร อินเดช', 'นาย นิพัต มุสันเที๊ยะ', 'นาย จักรินทร์ สินพันธ์'
   ],
   // ตัวเลือกชั้นเริ่มต้น (ใส่เพิ่มได้) — ระบบรวมกับค่าที่เคยบันทึกไว้ในชีตให้อัตโนมัติ
+  // รอบการตรวจ: ชื่อรอบ + ช่วงเวลา [เริ่ม, สิ้นสุด) แบบ 24 ชม. (รอบดึกข้ามเที่ยงคืนได้)
+  SHIFTS: [
+    { name: 'เช้า', from: 6, to: 14 },
+    { name: 'บ่าย', from: 14, to: 22 },
+    { name: 'ดึก', from: 22, to: 6 }
+  ],
   FLOORS: ['B', '1', '2', '3', '4', '5', '6'],   // ตัวเลือกชั้นมาตรฐาน (เพิ่ม/ลดได้) + มีตัวเลือก "อื่นๆ" ให้พิมพ์เอง
   ZONES: [],
   REPORT_QUALITY: 0.88,         // คุณภาพ JPEG ของใบรายงาน LINE (ไฟล์ ~200–400KB ส่งใน LINE ได้คมชัด)
@@ -645,7 +656,7 @@ const state = {
   lastUpdated: null,
   view: 'form',
   period: { type: 'month', anchor: nowMall() },
-  filters: { q: '', store: '', inspector: '', status: '' },
+  filters: { q: '', store: '', inspector: '', shift: '', status: '' },
   page: 1,
   charts: {},
   saving: false,
@@ -673,7 +684,7 @@ const LOGO_URL = svgToDataUrl(buildLogoSvg());
 
 /* ลำดับคอลัมน์ใน Google Sheets (v3) — ต้องตรงกับ HEADERS ใน Code_StoreInspect_v3.gs
    ข้อมูลหลักอยู่หน้า ไฟล์รูป (รูปจุดตรวจ + ใบรายงาน) อยู่ท้ายสุด */
-const REC_FIELDS = ['ID', 'Timestamp', 'InspectionDate', 'InspectionTime', 'InspectorName', 'Floor', 'Zone', 'StoreName', 'Status', 'Note', 'Details', 'ImageURL', 'ReportURL'];
+const REC_FIELDS = ['ID', 'Timestamp', 'InspectionDate', 'InspectionTime', 'InspectorName', 'Shift', 'Floor', 'Zone', 'StoreName', 'Status', 'Note', 'Details', 'ImageURL', 'ReportURL'];
 const TH_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 const TH_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const TH_DAYS = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
@@ -782,6 +793,13 @@ function sanitizeRecords(list) {
   return { records: [...map.values()], invalid, dupes };
 }
 const floorZone = r => [r.Floor && `ชั้น ${r.Floor}`, r.Zone && `โซน ${r.Zone}`].filter(Boolean).join(' · ');
+/** รอบการตรวจของเวลาที่กำหนด — รองรับรอบที่คร่อมเที่ยงคืน (เช่น ดึก 22:00–06:00) */
+function shiftOf(d) {
+  const h = (d || nowMall()).getHours();
+  const hit = CONFIG.SHIFTS.find(s => s.from <= s.to ? (h >= s.from && h < s.to) : (h >= s.from || h < s.to));
+  return hit ? hit.name : '';
+}
+const shiftLabel = r => r.Shift || '';
 const byNewest = (a, b) => (b._date ? b._date.getTime() : -Infinity) - (a._date ? a._date.getTime() : -Infinity);
 
 function randomToken(len = 4) {
@@ -893,7 +911,7 @@ function createMockData() {
         Note: notes[Math.floor(rand() * notes.length)], Details: details[Math.floor(rand() * details.length)],
         Status: rand() < 0.82 ? STATUS_OK : STATUS_PENDING,
         InspectorName: inspectors[Math.floor(rand() * inspectors.length)],
-        Floor: floors[si % floors.length], Zone: zones[Math.floor(rand() * zones.length)], ReportURL: ''  // ข้อมูลจำลอง: ใบรายงานสร้างสดจากข้อมูล
+        Shift: shiftOf(d), Floor: floors[si % floors.length], Zone: zones[Math.floor(rand() * zones.length)], ReportURL: ''  // ข้อมูลจำลอง: ใบรายงานสร้างสดจากข้อมูล
       });
     }
   }
@@ -1287,6 +1305,16 @@ function renderFloorOptions() {
 }
 function syncFloorOther() { $('#fFloorOther').hidden = $('#fFloor').value !== OTHER_INSPECTOR; }
 const getFloor = () => $('#fFloor').value === OTHER_INSPECTOR ? $('#fFloorOther').value.trim() : $('#fFloor').value.trim();
+/** รอบการตรวจ: เลือกรอบตามเวลาปัจจุบันให้อัตโนมัติ แต่ผู้ตรวจเปลี่ยนเองได้ (เช่น บันทึกย้อนรอบก่อนหน้า) */
+function renderShiftOptions({ auto = false } = {}) {
+  const sel = $('#fShift'); if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = CONFIG.SHIFTS.map(sh => `<option value="${escapeHtml(sh.name)}">รอบ${escapeHtml(sh.name)} (${pad2(sh.from)}:00–${pad2(sh.to)}:00)</option>`).join('');
+  const now = shiftOf();
+  sel.value = (!auto && cur && CONFIG.SHIFTS.some(sh => sh.name === cur)) ? cur : now;
+  $('#fShiftHint').textContent = sel.value === now ? `เลือกอัตโนมัติจากเวลาปัจจุบัน (${fmtHMS(nowMall()).slice(0, 5)} น.)` : `เวลาปัจจุบันอยู่ในรอบ${now} — คุณเลือกบันทึกเป็นรอบ${sel.value}`;
+}
+const getShift = () => $('#fShift').value.trim();
 function renderInspectorOptions() {
   const sel = $('#fInspector');
   sel.innerHTML = `<option value="">— เลือกผู้ตรวจ (${nf(CONFIG.INSPECTORS.length)} รายชื่อ) —</option>`
@@ -1321,9 +1349,10 @@ async function handleSubmit() {
   if (state.saving) return; // กันกดซ้ำระหว่างกำลังส่ง
   const f = state.form;
   const storeName = $('#fStore').value.trim(), inspector = getInspector();
-  const floor = getFloor(), zone = $('#fZone').value.trim();
+  const floor = getFloor(), zone = $('#fZone').value.trim(), shift = getShift() || shiftOf();
   const need = (el, text) => { el.focus(); return dialog({ icon: 'warning', title: 'กรุณากรอกข้อมูลให้ครบถ้วน', text }); };
   if (!storeName) return need($('#fStore'), 'กรุณาระบุชื่อร้านค้า / สถานที่ตรวจ');
+  if (!shift) return need($('#fShift'), 'กรุณาเลือกรอบการตรวจ');
   if (!floor) return need($('#fFloor').value === OTHER_INSPECTOR ? $('#fFloorOther') : $('#fFloor'), 'กรุณาเลือกหรือระบุชั้นของจุดตรวจ');
   if (!inspector) return need($('#fInspector').value === OTHER_INSPECTOR ? $('#fInspectorOther') : $('#fInspector'), 'กรุณาเลือกหรือระบุชื่อผู้ตรวจ');
   if (f.processing) return toast('info', 'กรุณารอประมวลผลรูปภาพสักครู่');
@@ -1337,7 +1366,7 @@ async function handleSubmit() {
   if (!f.pendingId) f.pendingId = genId(now); // ส่งซ้ำหลังล้มเหลวจะใช้ ID เดิม → ไม่เกิดแถวซ้ำ
   const record = {
     ID: f.pendingId, Timestamp: tsReal.toISOString(), InspectionDate: fmtDMY(now), InspectionTime: fmtHMS(now),
-    InspectorName: inspector, Floor: floor, Zone: zone, StoreName: storeName,
+    InspectorName: inspector, Shift: shift, Floor: floor, Zone: zone, StoreName: storeName,
     Status: f.confirmed ? STATUS_OK : STATUS_PENDING,
     Note: $('#fNote').value.trim(), Details: $('#fDetails').value.trim(), ImageURL: '', ReportURL: ''
   };
@@ -1386,7 +1415,7 @@ async function handleSubmit() {
   } finally {
     state.saving = false; setBtnLoading(btn, false);
   }
-  if (saved) { store.set('insp_inspector', inspector); resetForm(); }
+  if (saved) { store.set('insp_inspector', inspector); resetForm(); renderShiftOptions({ auto: true }); }
   // เปิดหน้าต่างใบรายงานหลังคืนสถานะปุ่มแล้ว (ปุ่มไม่ค้าง "กำลังบันทึก" ระหว่างดูใบรายงาน)
   if (saved) await openReportViewer(reportUrl, saved, { justSaved: true, queued });
 }
@@ -1503,7 +1532,7 @@ async function buildReportImage(rec, photoSrc) {
   const tiles = [
     ['วันที่บันทึก', fmtDMY(d), fmtThaiLong(d, true), ['#e0f2fe', '#0369a1']],
     ['เวลาที่บันทึก', `${fmtHMS(d)} น.`, 'เวลาบันทึกอัตโนมัติ', ['#f3e8ff', '#7e22ce']],
-    ['ผู้ตรวจ', rec.InspectorName || '—', '', ['#dcfce7', '#15803d']],
+    ['ผู้ตรวจ', rec.InspectorName || '—', rec.Shift ? `รอบ${rec.Shift}` : '', ['#dcfce7', '#15803d']],
     ['ชั้น / โซน', [rec.Floor || '—', rec.Zone || '—'].join(' / '), '', ['#fef3c7', '#b45309']]
   ];
   const TW = (IW - 22) / 2;
@@ -1566,7 +1595,7 @@ function dataUrlToBlob(url) {
 function reportText(rec) {
   const d = rec._date;
   return [`📋 ใบรายงานการตรวจร้านค้า`, `🏬 ${rec.StoreName}`, floorZone(rec) ? `📍 ${floorZone(rec)}` : '',
-    `📅 ${d ? fmtDMY(d) : rec.InspectionDate} เวลา ${d ? fmtHMS(d) : rec.InspectionTime} น.`, `👤 ผู้ตรวจ: ${rec.InspectorName}`,
+    `📅 ${d ? fmtDMY(d) : rec.InspectionDate} เวลา ${d ? fmtHMS(d) : rec.InspectionTime} น.${rec.Shift ? ` (รอบ${rec.Shift})` : ''}`, `👤 ผู้ตรวจ: ${rec.InspectorName}`,
     `${isConfirmed(rec.Status) ? '✅' : '⏳'} สถานะ: ${isConfirmed(rec.Status) ? STATUS_OK : STATUS_PENDING}`,
     rec.Note ? `📝 หมายเหตุ: ${rec.Note}` : '', `รหัส: ${rec.ID}`].filter(Boolean).join('\n');
 }
@@ -1662,6 +1691,7 @@ function renderDetail(rec) {
         <div class="label mb-1">${icon('store')}ชื่อร้านค้า / สถานที่ตรวจ</div>
         <div class="text-2xl font-bold leading-snug break-words">${escapeHtml(rec.StoreName) || '—'}</div>
         <div class="flex flex-wrap gap-2 mt-2">
+          ${rec.Shift ? `<span class="badge" style="background:color-mix(in srgb,#f59e0b 16%,var(--surface));color:#b45309">${icon('clock')}รอบ${escapeHtml(rec.Shift)}</span>` : ''}
           ${rec.Floor ? `<span class="badge" style="background:color-mix(in srgb,#0891b2 14%,var(--surface));color:#0891b2">${icon('layers')}ชั้น ${escapeHtml(rec.Floor)}</span>` : ''}
           ${rec.Zone ? `<span class="badge" style="background:color-mix(in srgb,#7c3aed 14%,var(--surface));color:#7c3aed">${icon('grid')}โซน ${escapeHtml(rec.Zone)}</span>` : ''}
         </div>
@@ -1887,6 +1917,7 @@ async function printSlip() {
       <tr><th>เวลาที่บันทึก</th><td>${d ? fmtHMS(d) : escapeHtml(r.InspectionTime)} น.</td></tr>
       <tr><th>ผู้ตรวจ</th><td>${escapeHtml(r.InspectorName) || '—'}</td></tr>
       <tr><th>สถานะ</th><td>${r._ok ? '✔ ยืนยันจุดตรวจแล้ว' : 'รอยืนยันจุดตรวจ'}</td></tr>
+      <tr><th>รอบการตรวจ</th><td>${escapeHtml(r.Shift) ? `รอบ${escapeHtml(r.Shift)}` : '—'}</td></tr>
       <tr><th>ชั้น / โซน</th><td>${escapeHtml([r.Floor && `ชั้น ${r.Floor}`, r.Zone && `โซน ${r.Zone}`].filter(Boolean).join('  ·  ')) || '—'}</td></tr>
       <tr><th>หมายเหตุ</th><td>${escapeHtml(r.Note) || '—'}</td></tr>
       <tr><th>รายละเอียดเพิ่มเติม</th><td>${escapeHtml(r.Details) || '—'}</td></tr>
@@ -2094,6 +2125,7 @@ function handleEvents() {
   $('#confirmToggle').addEventListener('click', () => { state.form.confirmed = !state.form.confirmed; renderConfirm(); if (navigator.vibrate) navigator.vibrate(15); });
   $('#fInspector').addEventListener('change', () => { syncInspectorOther(); if ($('#fInspector').value === OTHER_INSPECTOR) $('#fInspectorOther').focus(); });
   $('#fFloor').addEventListener('change', () => { syncFloorOther(); if ($('#fFloor').value === OTHER_INSPECTOR) $('#fFloorOther').focus(); });
+  $('#fShift').addEventListener('change', () => renderShiftOptions());
   $('#detailReportBtn').addEventListener('click', () => { if (state.currentDetail) openRecordReport(state.currentDetail); });
   $('#btnSubmit').addEventListener('click', handleSubmit);
   // Detail
@@ -2134,7 +2166,7 @@ function init() {
   renderSyncBadge();
   checkLibraries();
   handleEvents();
-  renderInspectorOptions(); renderFloorOptions();
+  renderInspectorOptions(); renderFloorOptions(); renderShiftOptions({ auto: true });
   updateClock(); setInterval(updateClock, 1000);
   renderPhoto(); renderConfirm();
   showView('form');
