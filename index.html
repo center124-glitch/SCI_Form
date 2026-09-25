@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ============================================================================
-   SBK Store Inspect — ระบบบันทึกการตรวจร้านค้า & แดชบอร์ดสรุปผล   SCI_Form_v10.html v10.0 — แอปฟอร์มบันทึกการตรวจ (เบา เปิดเร็ว) · โทนเขียวมรกต
+   SBK Store Inspect — ระบบบันทึกการตรวจร้านค้า & แดชบอร์ดสรุปผล   SCI_Form_v12.html v12.0 — แอปฟอร์มบันทึกการตรวจ (เบา เปิดเร็ว) · โทนเขียวมรกต
    v4.0: แดชบอร์ดโฉมใหม่ 3 แท็บ (ภาพรวม / รายงานรายวัน / ประวัติ), รายงานประจำวัน (LINE + A4),
          เชื่อมต่อทนทานขึ้น (retry, fetch→JSONP สำรอง, แคช, Outbox ออฟไลน์, รีเฟรชอัตโนมัติ)
    v3.0: รายชื่อผู้ตรวจ, ชั้น/โซน, ตัด GPS, ฝัง URL Web App, ใบรายงาน LINE (ดูตัวอย่างก่อนบันทึก,
@@ -255,6 +255,30 @@ html[data-theme="dark"] .brand-title{background:linear-gradient(90deg,#5eead4,#7
   #periodLabel{min-width:0;flex:1;font-size:.95rem}
 }
 
+/* ความกว้างของเนื้อหา: จอใหญ่ใช้พื้นที่เต็มกว่าเดิม ~50% (1152px → สูงสุด 1728px)
+   แต่ยังจำกัดไว้ไม่ให้ตารางยืดจนอ่านยากบนจอ ultra-wide */
+.app-container{max-width:1470px;margin-left:auto;margin-right:auto;width:100%}
+@media (min-width:1280px){ .app-container{padding-left:2.5rem;padding-right:2.5rem} }
+@media (min-width:1700px){ .app-container{padding-left:3rem;padding-right:3rem} }
+
+/* แถบเลือกช่วงเวลาในแถบหัว (โทนกระจกให้อ่านง่ายบนพื้นไล่สี) */
+.hero-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-top:1rem;color:#fff}
+.hero-bar .btn-glass{padding:.5rem .9rem}
+.seg-hero{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28)}
+.seg-hero button{color:rgba(255,255,255,.85)}
+.seg-hero button:hover{color:#fff}
+.seg.seg-hero button.active{background:#fff;color:#1c1c3b;box-shadow:0 6px 14px -6px rgba(0,0,0,.45)}
+html[data-theme="dark"] .seg.seg-hero button.active{background:#f1f5f9;color:#111827}
+.icon-btn-hero{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.3);color:#fff}
+.icon-btn-hero:hover{background:rgba(255,255,255,.28);border-color:rgba(255,255,255,.45);color:#fff}
+@media (min-width:1024px){ .hero-bar{margin-top:1.1rem} .hero-bar > div:last-child{margin-left:auto} }
+@media (max-width:640px){
+  .hero-bar{gap:.5rem}
+  #periodSeg{display:grid;grid-template-columns:repeat(4,1fr);width:100%}
+  .hero-bar > div:last-child{width:100%;justify-content:space-between}
+  .hero-bar #periodLabel{min-width:0;flex:1;font-size:.92rem}
+}
+
 /* Toast */
 #toastBox{position:fixed;top:calc(env(safe-area-inset-top,0px) + .8rem);right:.8rem;z-index:3500;display:flex;flex-direction:column;gap:.5rem;pointer-events:none;width:min(92vw,380px)}
 @media (max-width:640px){#toastBox{left:50%;right:auto;transform:translateX(-50%)}}
@@ -386,7 +410,7 @@ html[data-theme="dark"]{--primary:#34d399;--primary-600:#6ee7b7;--primary-soft:#
 
 <!-- ═══════════════════════ APP BAR ═══════════════════════ -->
 <header class="appbar">
-  <div class="max-w-6xl mx-auto px-4 h-16 flex items-center gap-3">
+  <div class="app-container px-4 h-16 flex items-center gap-3">
     <img class="brand-logo app-logo" id="brandLogo" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22bg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%230d9488%22/%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%230891b2%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%236366f1%22/%3E%3C/linearGradient%3E%3ClinearGradient%20id%3D%22gold%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fde68a%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f59e0b%22/%3E%3C/linearGradient%3E%3CradialGradient%20id%3D%22shine%22%20cx%3D%22.25%22%20cy%3D%22.15%22%20r%3D%22.85%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.38%22/%3E%3Cstop%20offset%3D%22.6%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22116%22%20fill%3D%22url%28%23bg%29%22/%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22116%22%20fill%3D%22url%28%23shine%29%22/%3E%3Cg%3E%3Crect%20x%3D%22108%22%20y%3D%22370%22%20width%3D%22296%22%20height%3D%2216%22%20rx%3D%228%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.85%22/%3E%3Crect%20x%3D%22140%22%20y%3D%22180%22%20width%3D%22232%22%20height%3D%22194%22%20rx%3D%2216%22%20fill%3D%22%23fff%22%20fill-opacity%3D%22.96%22/%3E%3Crect%20x%3D%22172%22%20y%3D%22262%22%20width%3D%2266%22%20height%3D%22112%22%20rx%3D%2210%22%20fill%3D%22url%28%23bg%29%22/%3E%3Ccircle%20cx%3D%22224%22%20cy%3D%22320%22%20r%3D%226%22%20fill%3D%22%23fff%22/%3E%3Crect%20x%3D%22262%22%20y%3D%22222%22%20width%3D%2284%22%20height%3D%2262%22%20rx%3D%2210%22%20fill%3D%22url%28%23bg%29%22%20fill-opacity%3D%22.9%22/%3E%3Cpath%20d%3D%22M120%20148%20156%2098h200l36%2050z%22%20fill%3D%22%23fff%22/%3E%3Cpath%20d%3D%22M188%2098h34l-10%2050h-44zM290%2098h34l24%2050h-44z%22%20fill%3D%22url%28%23gold%29%22%20fill-opacity%3D%22.9%22/%3E%3Cpath%20d%3D%22M120%20148h68v18a34%2034%200%200%201-68%200z%22%20fill%3D%22%23fff%22/%3E%3Cpath%20d%3D%22M188%20148h68v18a34%2034%200%200%201-68%200z%22%20fill%3D%22url%28%23gold%29%22/%3E%3Cpath%20d%3D%22M256%20148h68v18a34%2034%200%200%201-68%200z%22%20fill%3D%22%23fff%22/%3E%3Cpath%20d%3D%22M324%20148h68v18a34%2034%200%200%201-68%200z%22%20fill%3D%22url%28%23gold%29%22/%3E%3Ccircle%20cx%3D%22362%22%20cy%3D%22366%22%20r%3D%2276%22%20fill%3D%22url%28%23gold%29%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2214%22/%3E%3Cpath%20d%3D%22m326%20366%2024%2024%2050-54%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/g%3E%3C/svg%3E" alt="โลโก้" title="แสดงหน้าโลโก้">
     <div class="min-w-0 flex-1 md:flex-none">
       <div class="font-bold leading-tight truncate"><span class="brand-title">Store Checkpoint Inspection</span> <span class="hidden sm:inline muted font-medium text-sm">· ระบบบันทึกการตรวจจุดตรวจร้านค้า</span></div>
@@ -401,7 +425,7 @@ html[data-theme="dark"]{--primary:#34d399;--primary-600:#6ee7b7;--primary-soft:#
   </div>
 </header>
 
-<main class="max-w-6xl mx-auto px-4 pt-5 pb-28 md:pb-12">
+<main class="app-container px-4 pt-5 pb-28 md:pb-12">
 
   <!-- ═══════════════════════ VIEW: FORM (บันทึกการตรวจ) ═══════════════════════ -->
   <section id="view-form" class="fade-in">
@@ -453,8 +477,8 @@ html[data-theme="dark"]{--primary:#34d399;--primary-600:#6ee7b7;--primary-soft:#
             <span id="photoMeta" class="text-xs muted"></span>
           </div>
           <div id="photoBox" class="photo-box" role="button" tabindex="0" aria-label="ถ่ายภาพจุดตรวจ"></div>
-          <div class="grid grid-cols-2 gap-2 mt-3">
-            <button class="btn btn-soft" id="btnCamera"><span data-icon="camera"></span>ถ่ายภาพ</button>
+          <div class="grid grid-cols-2 gap-2 mt-3" id="photoActions">
+            <button class="btn btn-soft" id="btnCamera"><span data-icon="camera"></span>ถ่ายภาพจากกล้อง</button>
             <button class="btn btn-ghost" id="btnGallery"><span data-icon="image"></span>เลือกรูปภาพ</button>
           </div>
           <button class="btn btn-danger w-full mt-2" id="btnRemovePhoto" hidden><span data-icon="x"></span>ลบรูปภาพนี้</button>
@@ -600,6 +624,7 @@ const CONFIG = {
   APP_NAME: 'Store Checkpoint Inspection Form',
   APP_ROLE: 'form',             // ไฟล์นี้คือแอปฟอร์มบันทึก — ดูสรุปผลเต็มรูปแบบได้ที่แอปแดชบอร์ด
   DASHBOARD_URL: '',            // เว้นว่าง = ระบบเดาลิงก์แดชบอร์ดให้เอง (…/exec?app=dashboard)
+  ALLOW_GALLERY: false,   // แอปฟอร์มหน้างาน: ถ่ายจากกล้องเท่านั้น เพื่อยืนยันว่าตรวจ ณ จุดจริง          // true = เลือกรูปจากเครื่องได้ด้วย · false = ถ่ายจากกล้องเท่านั้น (ใช้กับแอปฟอร์มหน้างาน)
   APP_SHORT_NAME: 'Checkpoint Form',
   SPLASH_MS: 3000,              // หน้าโลโก้ตอนเปิดแอป แล้วเข้าสู่ระบบอัตโนมัติ (กำหนดได้ 2000–4000 ms)
   IDLE_MS: 4 * 60 * 1000,       // ไม่มีการใช้งานกี่ ms จึงแสดงหน้าพักจอ (กำหนดได้ 3–5 นาที)
@@ -652,6 +677,7 @@ const state = {
   clockWarned: false,
   truncated: 0,
   dailyDate: nowMall(),
+  repType: 'day',            // ชนิดรายงานในแท็บ "รายงานสรุป": day | month | year
   loading: false,
   lastUpdated: null,
   view: 'form',
@@ -1174,7 +1200,9 @@ async function showConnectionInfo() {
       ${ERRORS.length ? `<div class="text-xs" style="color:var(--muted)"><b>บันทึกข้อผิดพลาด (${nf(ERRORS.length)}):</b> ${escapeHtml(ERRORS.slice(-2).map(e => `${fmtHMS(e.at)} ${e.label}: ${e.message}`).join(' · '))}</div>` : ''}
       </div>`,
     showCancelButton: true, showDenyButton: !!Outbox.items.length, denyButtonText: 'ส่งรายการค้างใหม่ทั้งหมด',
-    confirmButtonText: 'ทดสอบการเชื่อมต่อ', cancelButtonText: 'ปิด'
+    confirmButtonText: 'ทดสอบการเชื่อมต่อ', cancelButtonText: 'ปิด',
+    footer: CONFIG.APP_ROLE === 'dashboard' ? '<a href="#form" id="lnkOpenForm">เปิดหน้าบันทึกการตรวจ (ซ่อนเมนูไว้)</a>' : undefined,
+    didOpen: () => { const a = $('#lnkOpenForm'); if (a) a.addEventListener('click', () => { Swal.close(); showView('form'); }); }
   });
   if (r.isDenied) return Outbox.retryAll();
   if (!r.isConfirmed) return;
@@ -1229,12 +1257,21 @@ function updateClock() {
   if (Splash.visible) Splash.tick(now);
 }
 
+/** โหมดกล้องอย่างเดียว: ซ่อนปุ่มเลือกรูป + ตัดช่องเลือกไฟล์ออกจาก DOM เพื่อไม่ให้เรียกใช้ได้เลย */
+function applyPhotoMode() {
+  const gal = $('#btnGallery'), input = $('#fileGallery');
+  if (CONFIG.ALLOW_GALLERY) return;
+  if (gal) gal.remove();
+  if (input) input.remove();
+  const box = $('#photoActions'); if (box) box.classList.replace('grid-cols-2', 'grid-cols-1');
+  const hint = $('#photoHint'); if (hint) hint.textContent = 'ต้องถ่ายจากกล้อง ณ จุดตรวจเท่านั้น (ระบบประทับวัน–เวลาลงบนภาพให้อัตโนมัติ)';
+}
 function renderPhoto() {
   const box = $('#photoBox'); const img = state.form.image;
   box.classList.toggle('has-img', !!img);
   let html = img
     ? `<img src="${img.dataUrl}" alt="รูปภาพจุดตรวจ">`
-    : `<div class="text-center px-6 muted"><div class="mx-auto mb-2 w-14 h-14 rounded-2xl grid place-items-center" style="background:var(--grad-brand);color:#fff;box-shadow:0 10px 22px -10px rgba(8,145,178,.8)">${icon('camera', 'w-7 h-7')}</div><div class="font-semibold" style="color:var(--text)">แตะเพื่อถ่ายภาพจุดตรวจ</div><div class="text-xs mt-0.5">รองรับ JPG / PNG / WEBP · ระบบย่อขนาดให้อัตโนมัติ</div></div>`;
+    : `<div class="text-center px-6 muted"><div class="mx-auto mb-2 w-14 h-14 rounded-2xl grid place-items-center" style="background:var(--grad-brand);color:#fff;box-shadow:0 10px 22px -10px rgba(8,145,178,.8)">${icon('camera', 'w-7 h-7')}</div><div class="font-semibold" style="color:var(--text)">แตะเพื่อถ่ายภาพจุดตรวจ</div><div class="text-xs mt-0.5" id="photoHint">${CONFIG.ALLOW_GALLERY ? 'รองรับ JPG / PNG / WEBP · ระบบย่อขนาดให้อัตโนมัติ' : 'ต้องถ่ายจากกล้อง ณ จุดตรวจเท่านั้น (ระบบประทับวัน–เวลาให้อัตโนมัติ)'}</div></div>`;
   if (state.form.processing) html += `<div class="photo-overlay"><div class="flex items-center gap-2 font-semibold" style="color:var(--primary)"><span class="spinner"></span>กำลังประมวลผลรูปภาพ…</div></div>`;
   box.innerHTML = html;
   $('#photoMeta').textContent = img ? `${img.w}×${img.h}px · ${(img.bytes / 1024).toFixed(0)} KB` : '';
@@ -2169,12 +2206,12 @@ function handleEvents() {
   $$('[data-nav]').forEach(b => b.addEventListener('click', () => showView(b.dataset.nav)));
   $('#themeBtn').addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
   // Form
-  $('#formBackBtn').addEventListener('click', () => showView('dashboard'));
+  $('#formBackBtn').addEventListener('click', () => { if (location.hash) history.replaceState(null, '', location.pathname + location.search); showView('dashboard'); });
   $('#formClearBtn').addEventListener('click', handleClearForm);
   $('#btnCamera').addEventListener('click', () => $('#fileCamera').click());
-  $('#btnGallery').addEventListener('click', () => $('#fileGallery').click());
+  if ($('#btnGallery')) $('#btnGallery').addEventListener('click', () => $('#fileGallery').click());
   $('#fileCamera').addEventListener('change', handleFile);
-  $('#fileGallery').addEventListener('change', handleFile);
+  if ($('#fileGallery')) $('#fileGallery').addEventListener('change', handleFile);
   $('#photoBox').addEventListener('click', () => { if (state.form.processing) return; state.form.image ? openPhotoPreview(state.form.image.dataUrl, $('#fStore').value.trim()) : $('#fileCamera').click(); });
   $('#photoBox').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#photoBox').click(); } });
   $('#btnRemovePhoto').addEventListener('click', () => { state.form.image = null; renderPhoto(); });
@@ -2200,6 +2237,12 @@ function handleEvents() {
   $('#view-dashboard').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-open]')) { e.preventDefault(); openDetail(e.target.dataset.open); } });
   // การเชื่อมต่อ
   $('#syncBadge').addEventListener('click', showConnectionInfo);
+  // ทางลัดลับสำหรับหัวหน้างาน: เปิดหน้าบันทึกการตรวจในแอปแดชบอร์ด (เมนูถูกซ่อนไว้)
+  window.addEventListener('hashchange', () => { if (/form/i.test(location.hash || '')) showView('form'); });
+  if (CONFIG.APP_ROLE === 'dashboard') {
+    const logo = $('#brandLogo');
+    if (logo) logo.addEventListener('dblclick', e => { e.preventDefault(); showView('form'); toast('info', 'เปิดหน้าบันทึกการตรวจ (เมนูซ่อนอยู่)'); });
+  }
   window.addEventListener('online', () => { NET.online = true; renderSyncBadge(); toast('success', 'กลับมาออนไลน์แล้ว'); Outbox.flush(); loadData({ silent: true }); });
   window.addEventListener('offline', () => { NET.online = false; renderSyncBadge(); toast('warning', 'ขาดการเชื่อมต่ออินเทอร์เน็ต — บันทึกได้ตามปกติ ระบบจะส่งให้เมื่อออนไลน์'); });
   window.addEventListener('afterprint', () => { $('#printArea').innerHTML = ''; Idle.reset(); });
@@ -2224,8 +2267,10 @@ function init() {
   handleEvents();
   renderInspectorOptions(); renderFloorOptions(); renderShiftOptions({ auto: true });
   updateClock(); setInterval(updateClock, 1000);
-  renderPhoto(); renderConfirm();
-  showView('form');
+  applyPhotoMode(); renderPhoto(); renderConfirm();
+  // แอปแดชบอร์ดเปิดที่หน้าสรุปเสมอ — หน้าบันทึกยังมีอยู่แต่ซ่อนเมนูไว้ (เข้าถึงด้วย #form)
+  const wantForm = /form/i.test(location.hash || '');
+  showView(CONFIG.APP_ROLE === 'dashboard' && !wantForm ? 'dashboard' : 'form');
   wireDashboardLink();
   Outbox.refresh().then(() => { mergeRecords(); Outbox.flush(); }); // มีรายการค้างจากครั้งก่อน → ส่งต่อให้
   loadData({ silent: true });    // โหลดล่วงหน้าเพื่อเติมรายชื่อร้านค้าใน datalist
