@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ============================================================================
-   SBK Store Inspect — ระบบบันทึกการตรวจร้านค้า & แดชบอร์ดสรุปผล   SCI_Form_v9.html v9.0 — แอปฟอร์มบันทึกการตรวจ (เบา เปิดเร็ว) · โทนเขียวมรกต
+   SBK Store Inspect — ระบบบันทึกการตรวจร้านค้า & แดชบอร์ดสรุปผล   SCI_Form_v10.html v10.0 — แอปฟอร์มบันทึกการตรวจ (เบา เปิดเร็ว) · โทนเขียวมรกต
    v4.0: แดชบอร์ดโฉมใหม่ 3 แท็บ (ภาพรวม / รายงานรายวัน / ประวัติ), รายงานประจำวัน (LINE + A4),
          เชื่อมต่อทนทานขึ้น (retry, fetch→JSONP สำรอง, แคช, Outbox ออฟไลน์, รีเฟรชอัตโนมัติ)
    v3.0: รายชื่อผู้ตรวจ, ชั้น/โซน, ตัด GPS, ฝัง URL Web App, ใบรายงาน LINE (ดูตัวอย่างก่อนบันทึก,
@@ -498,8 +498,8 @@ html[data-theme="dark"]{--primary:#34d399;--primary-600:#6ee7b7;--primary-soft:#
           </span>
         </button>
 
-        <button class="btn btn-primary btn-lg w-full" id="btnSubmit"><span data-icon="file"></span>ดูตัวอย่างใบรายงาน &amp; บันทึก</button>
-        <div class="text-xs muted text-center -mt-2">ระบบจะแสดงใบรายงานสำหรับส่ง LINE ให้ตรวจสอบก่อนบันทึกจริง</div>
+        <button class="btn btn-primary btn-lg w-full" id="btnSubmit"><span data-icon="file"></span>ตรวจสอบและบันทึกการตรวจ</button>
+        <div class="text-xs muted text-center -mt-2">ระบบจะประทับวัน–เวลาลงบนภาพ และแสดงตัวอย่างใบรายงานให้ตรวจสอบก่อนบันทึกจริง</div>
       </div>
     </div>
   </section>
@@ -512,7 +512,7 @@ html[data-theme="dark"]{--primary:#34d399;--primary-600:#6ee7b7;--primary-soft:#
         <h1>รายละเอียดจุดตรวจ</h1>
         <div class="text-xs muted truncate" id="detailId">—</div>
       </div>
-      <button class="icon-btn" id="detailReportBtn" title="ใบรายงาน LINE" aria-label="ใบรายงาน LINE" data-icon="file" style="color:#06c755"></button>
+      <button class="icon-btn" id="detailReportBtn" title="ใบรายงานการตรวจ" aria-label="ใบรายงานการตรวจ" data-icon="file" style="color:#06c755"></button>
       <button class="icon-btn" id="detailPrintBtn" title="พิมพ์ใบสรุปการตรวจ" aria-label="พิมพ์" data-icon="printer"></button>
       <button class="icon-btn danger" id="detailDeleteBtn" title="ลบข้อมูล" aria-label="ลบข้อมูล" data-icon="trash"></button>
     </div>
@@ -590,7 +590,7 @@ const CONFIG = {
   ],
   FLOORS: ['B', '1', '2', '3', '4', '5', '6'],   // ตัวเลือกชั้นมาตรฐาน (เพิ่ม/ลดได้) + มีตัวเลือก "อื่นๆ" ให้พิมพ์เอง
   ZONES: [],
-  REPORT_QUALITY: 0.88,         // คุณภาพ JPEG ของใบรายงาน LINE (ไฟล์ ~200–400KB ส่งใน LINE ได้คมชัด)
+  REPORT_QUALITY: 0.88,         // คุณภาพ JPEG ของใบรายงาน (ไฟล์ ~200–400KB คมชัดพอสำหรับส่งต่อ/พิมพ์)
   ORG_NAME: 'ศูนย์การค้าซีคอนบางแค',
   DEPT_NAME: 'แผนกรักษาความปลอดภัย',
   REPORT_TITLE: 'รายงานสรุปผลการตรวจจุดตรวจร้านค้า',
@@ -1204,6 +1204,11 @@ function dialog(opts) {
   if (typeof Swal === 'undefined') return Promise.resolve({ isConfirmed: window.confirm(`${opts.title || ''}\n${(opts.text || '').replace(/<[^>]+>/g, '')}`) });
   return Swal.fire({ ...swalBase(), ...opts });
 }
+function openPhotoPreview(src, title) {
+  if (!src || typeof Swal === 'undefined') return;
+  Swal.fire({ imageUrl: src, imageAlt: title || 'รูปภาพ', title: title ? escapeHtml(title) : undefined, width: 'min(92vw, 900px)', showConfirmButton: false, showCloseButton: true, padding: '1rem' });
+}
+
 function setBtnLoading(btn, loading, loadingText) {
   if (loading) {
     btn.dataset.html = btn.innerHTML; btn.disabled = true;
@@ -1260,6 +1265,49 @@ function compressImage(file) {
     img.src = url;
   });
 }
+/**
+ * ประทับข้อมูลลงบนภาพถ่าย (วัน–เวลา + ร้าน/ชั้น/โซน/รอบ/ผู้ตรวจ) เหมือนกล้อง CCTV
+ * ทำตอน "กดบันทึก" ไม่ใช่ตอนแนบรูป เพราะข้อมูลร้าน/ชั้น/รอบ อาจถูกกรอกหลังแนบรูป
+ * ถ้าประทับไม่สำเร็จ (เช่นหน่วยความจำไม่พอ) จะคืนรูปเดิมเพื่อให้ยังบันทึกงานได้
+ */
+async function stampPhoto(dataUrl, info) {
+  try {
+    const img = await loadImg(dataUrl);
+    const W = img.naturalWidth, H = img.naturalHeight;
+    if (!W || !H) return dataUrl;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, W, H);
+    const S = W / 1280;                                  // สเกลตามความกว้างจริงของภาพ
+    const pad = Math.round(24 * S);
+    const fBig = Math.max(18, Math.round(46 * S)), fSmall = Math.max(13, Math.round(30 * S));
+    const line2 = [info.store, floorZone(info), info.shift ? `รอบ${info.shift}` : '', info.inspector].filter(Boolean).join('  ·  ');
+    ctx.font = `700 ${fBig}px ${RPT_FONT}`;
+    const w1 = ctx.measureText(info.stamp).width;
+    ctx.font = `500 ${fSmall}px ${RPT_FONT}`;
+    const w2 = ctx.measureText(line2).width;
+    const boxW = Math.min(W - pad * 2, Math.max(w1, w2) + pad * 2);
+    const boxH = fBig + fSmall + pad * 1.9;
+    const bx = pad, by = H - boxH - pad;
+    // แถบพื้นหลังโปร่งแสงให้ตัวอักษรอ่านออกทุกสภาพแสง
+    ctx.save();
+    const g = ctx.createLinearGradient(bx, by, bx, by + boxH);
+    g.addColorStop(0, 'rgba(8,20,20,.62)'); g.addColorStop(1, 'rgba(8,20,20,.78)');
+    rrect(ctx, bx, by, boxW, boxH, Math.round(18 * S)); ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.lineWidth = Math.max(1, S); ctx.stroke();
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#ffffff'; ctx.font = `700 ${fBig}px ${RPT_FONT}`;
+    ctx.fillText(info.stamp, bx + pad, by + pad * 0.7, boxW - pad * 2);
+    ctx.fillStyle = '#d7f5ea'; ctx.font = `500 ${fSmall}px ${RPT_FONT}`;
+    ctx.fillText(line2, bx + pad, by + pad * 0.7 + fBig * 1.15, boxW - pad * 2);
+    ctx.restore();
+    return c.toDataURL('image/jpeg', CONFIG.IMAGE_QUALITY);
+  } catch (err) {
+    ERRORS.push({ at: nowMall(), label: 'stampPhoto', message: String(err && err.message || err) });
+    return dataUrl;   // ประทับไม่ได้ก็ยังบันทึกรูปเดิมได้ ไม่ขวางการทำงานหน้างาน
+  }
+}
+
 async function handleFile(e) {
   const file = e.target.files && e.target.files[0];
   e.target.value = ''; // reset เพื่อให้เลือกไฟล์เดิมซ้ำได้ (change event จะยิงอีกครั้ง)
@@ -1275,11 +1323,6 @@ async function handleFile(e) {
     state.form.processing = false; renderPhoto();
   }
 }
-function openPhotoPreview(src, title) {
-  if (!src || typeof Swal === 'undefined') return;
-  Swal.fire({ imageUrl: src, imageAlt: title || 'รูปภาพ', title: title ? escapeHtml(title) : undefined, width: 'min(92vw, 900px)', showConfirmButton: false, showCloseButton: true, padding: '1rem' });
-}
-
 function renderConfirm() {
   const on = state.form.confirmed; const el = $('#confirmToggle');
   el.classList.toggle('on', on); el.setAttribute('aria-checked', String(on));
@@ -1358,10 +1401,6 @@ async function handleSubmit() {
   if (f.processing) return toast('info', 'กรุณารอประมวลผลรูปภาพสักครู่');
   if (!f.image) return dialog({ icon: 'warning', title: 'ยังไม่มีรูปภาพจุดตรวจ', text: 'กรุณาถ่ายภาพหรือเลือกรูปภาพจุดตรวจก่อนบันทึก' });
 
-  const b64 = f.image.dataUrl.split(',')[1] || '';
-  if (b64.length * 0.75 > CONFIG.MAX_UPLOAD_BYTES) {
-    return dialog({ icon: 'error', title: 'ไฟล์รูปภาพใหญ่เกินไป', text: 'กรุณาถ่ายภาพใหม่ หรือเลือกรูปที่มีความละเอียดน้อยลง' });
-  }
   const tsReal = nowReal(), now = mallDate(tsReal);
   if (!f.pendingId) f.pendingId = genId(now); // ส่งซ้ำหลังล้มเหลวจะใช้ ID เดิม → ไม่เกิดแถวซ้ำ
   const record = {
@@ -1371,17 +1410,41 @@ async function handleSubmit() {
     Note: $('#fNote').value.trim(), Details: $('#fDetails').value.trim(), ImageURL: '', ReportURL: ''
   };
 
-  // 1) สร้างใบรายงาน แล้ว "แสดงให้ตรวจก่อน" จึงค่อยบันทึกจริง
+  // 1) ประทับวัน–เวลาลงบนภาพ แล้วสร้างใบรายงาน เพื่อ "แสดงให้ตรวจสอบก่อน" จึงค่อยบันทึกจริง
   const btn = $('#btnSubmit');
-  setBtnLoading(btn, true, 'กำลังสร้างใบรายงาน…');
-  let reportUrl;
-  try { reportUrl = await buildReportImage(normalizeRecord(record), f.image.dataUrl); }
-  catch (err) { setBtnLoading(btn, false); return dialog({ icon: 'error', title: 'สร้างใบรายงานไม่สำเร็จ', text: err.message }); }
+  setBtnLoading(btn, true, 'กำลังประทับเวลาและสร้างใบรายงาน…');
+  let reportUrl, photoUrl, b64;
+  try {
+    photoUrl = await stampPhoto(f.image.dataUrl, {
+      stamp: `${fmtDMY(now)}  ${fmtHMS(now)} น.`, store: storeName, Floor: floor, Zone: zone, shift, inspector
+    });
+    b64 = photoUrl.split(',')[1] || '';
+    if (!b64) throw new Error('ประมวลผลรูปภาพไม่สำเร็จ');
+    if (b64.length * 0.75 > CONFIG.MAX_UPLOAD_BYTES) throw new Error('ไฟล์รูปภาพใหญ่เกินไป กรุณาถ่ายภาพใหม่หรือเลือกรูปที่ความละเอียดน้อยลง');
+    reportUrl = await buildReportImage(normalizeRecord(record), photoUrl);
+  } catch (err) {
+    setBtnLoading(btn, false);
+    return dialog({ icon: 'error', title: 'เตรียมข้อมูลก่อนบันทึกไม่สำเร็จ', text: err.message });
+  }
   setBtnLoading(btn, false);
+  const summaryRow = (l, v) => `<tr><th style="text-align:left;padding:.15rem .5rem;color:var(--muted);font-weight:500;white-space:nowrap">${l}</th><td style="padding:.15rem .5rem;font-weight:600">${escapeHtml(v || '—')}</td></tr>`;
   const pre = await dialog({
-    title: 'ตรวจสอบใบรายงานก่อนบันทึก',
-    html: `${reportPreviewHtml(reportUrl)}${f.confirmed ? '' : `<div class="text-sm mt-3" style="color:var(--warn)">ยังไม่ได้กด "ยืนยันจุดตรวจ" — จะบันทึกสถานะเป็น "รอยืนยัน"</div>`}`,
-    width: 'min(94vw, 560px)', showCancelButton: true, confirmButtonText: 'บันทึกและออกใบรายงาน', cancelButtonText: 'กลับไปแก้ไข'
+    title: 'ตรวจสอบก่อนบันทึก',
+    html: `<div class="text-left text-sm" style="border:1px solid var(--border);border-radius:1rem;padding:.6rem;margin-bottom:.7rem">
+        <table style="width:100%">
+          ${summaryRow('ร้านค้า / สถานที่', storeName)}
+          ${summaryRow('รอบ / ชั้น / โซน', [`รอบ${shift}`, `ชั้น ${floor}`, zone && `โซน ${zone}`].filter(Boolean).join('  ·  '))}
+          ${summaryRow('ผู้ตรวจ', inspector)}
+          ${summaryRow('วันที่ – เวลา', `${record.InspectionDate}  ${record.InspectionTime} น.`)}
+          ${summaryRow('สถานะ', f.confirmed ? 'ยืนยันจุดตรวจแล้ว' : 'รอยืนยัน')}
+          ${record.Note ? summaryRow('หมายเหตุ', record.Note) : ''}
+        </table></div>
+      ${reportPreviewHtml(reportUrl)}
+      <div class="text-xs mt-2" style="color:var(--muted)">ภาพถ่ายถูกประทับวัน–เวลาและข้อมูลจุดตรวจไว้บนรูปแล้ว</div>
+      ${f.confirmed ? '' : `<div class="text-sm mt-2" style="color:var(--warn)">ยังไม่ได้กด "ยืนยันจุดตรวจ" — จะบันทึกสถานะเป็น "รอยืนยัน"</div>`}`,
+    width: 'min(94vw, 560px)', showCancelButton: true,
+    confirmButtonText: 'ยืนยันและบันทึก', cancelButtonText: 'กลับไปแก้ไข',
+    focusCancel: true   // กันกดยืนยันโดยไม่ตั้งใจ (ต้องเลือกปุ่มยืนยันเอง)
   });
   if (!pre.isConfirmed) return;
 
@@ -1421,7 +1484,7 @@ async function handleSubmit() {
 }
 
 /* =============================================================================
-   8b) LINE REPORT — ใบรายงานรูปภาพ (JPEG 1080px) สำหรับส่งใน LINE
+   8b) REPORT IMAGE — ใบรายงานรูปภาพ (JPEG 1080px) สำหรับบันทึกเป็นไฟล์/ส่งต่อ
    วาดด้วย Canvas 2D โดยตรง (ไม่พึ่ง html2canvas) → ควบคุมตำแหน่ง/ฟอนต์ไทยได้แม่น และไฟล์เล็ก
    ============================================================================= */
 const RPT_FONT = "'IBM Plex Sans Thai','Sarabun',sans-serif";
@@ -1604,37 +1667,23 @@ function downloadDataUrl(url, fileName) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
-/** แชร์ไฟล์ภาพ (มือถือเลือก LINE ได้โดยตรง) — ถ้าอุปกรณ์/เบราว์เซอร์ไม่รองรับ จะดาวน์โหลดไฟล์แทน */
-async function shareImage(url, fileName, title, text) {
-  const file = new File([dataUrlToBlob(url)], fileName, { type: 'image/jpeg' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title, text }); return true; }
-    catch (e) { if (e && e.name === 'AbortError') return false; }
-  }
-  downloadDataUrl(url, fileName);
-  toast('info', 'ดาวน์โหลดไฟล์แล้ว — เปิด LINE แล้วแนบรูปนี้ได้เลย');
-  return false;
-}
-/** หน้าต่างแสดงรูปใบรายงาน + ปุ่ม ส่ง LINE / บันทึกรูป / ข้อความสรุป / เปิดไฟล์ใน Drive */
-function openImageViewer({ url, title, headHtml = '', fileName, shareTitle, text, driveLink = '', confirmText = 'ปิด', denyText = '' }) {
-  const lineText = `https://line.me/R/share?text=${encodeURIComponent(text)}`;
+/** หน้าต่างแสดงรูปใบรายงาน + ปุ่ม บันทึกรูป / คัดลอกข้อความสรุป / เปิดไฟล์ใน Drive */
+function openImageViewer({ url, title, headHtml = '', fileName, text, driveLink = '', confirmText = 'ปิด', denyText = '' }) {
   return dialog({
     title,
     html: `${headHtml}${reportPreviewHtml(url)}
       <div class="grid grid-cols-2 gap-2 mt-3">
-        <button type="button" class="btn" id="rvShare" style="background:#06c755;color:#fff">${icon('share')}ส่งเข้า LINE</button>
-        <button type="button" class="btn btn-ghost" id="rvDownload">${icon('download')}บันทึกรูปภาพ</button>
-        <a class="btn btn-ghost" href="${lineText}" target="_blank" rel="noopener">${icon('message')}ส่งข้อความสรุป</a>
-        ${driveLink ? `<a class="btn btn-ghost" href="${escapeHtml(driveLink)}" target="_blank" rel="noopener">${icon('external')}เปิดไฟล์ใน Drive</a>` : `<button type="button" class="btn btn-ghost" id="rvCopy">${icon('note')}คัดลอกข้อความ</button>`}
+        <button type="button" class="btn btn-primary" id="rvDownload">${icon('download')}บันทึกรูปภาพ</button>
+        <button type="button" class="btn btn-ghost" id="rvCopy">${icon('note')}คัดลอกข้อความสรุป</button>
+        ${driveLink ? `<a class="btn btn-ghost col-span-2" href="${escapeHtml(driveLink)}" target="_blank" rel="noopener">${icon('external')}เปิดไฟล์ใน Google Drive</a>` : ''}
       </div>
       <div class="text-xs mt-2" style="color:var(--muted)">มือถือ: กดค้างที่รูปเพื่อบันทึกได้ · คอมพิวเตอร์: คลิกขวาที่รูป &gt; บันทึกรูปภาพ</div>`,
     width: 'min(94vw, 560px)', showCloseButton: true,
     confirmButtonText: confirmText, showDenyButton: !!denyText, denyButtonText: denyText,
     didOpen: () => {
       Swal.hideLoading(); // กันสถานะ loading จากหน้าต่างก่อนหน้าค้างอยู่
-      $('#rvShare').addEventListener('click', () => shareImage(url, fileName, shareTitle, text));
-      $('#rvDownload').addEventListener('click', () => { downloadDataUrl(url, fileName); toast('success', 'บันทึกไฟล์รูปภาพแล้ว'); });
-      const cp = $('#rvCopy');
+      const dl = $('#rvDownload'), cp = $('#rvCopy');
+      if (dl) dl.addEventListener('click', () => { try { downloadDataUrl(url, fileName); toast('success', 'บันทึกไฟล์รูปภาพแล้ว'); } catch (e) { toast('error', 'บันทึกไฟล์ไม่สำเร็จ — กดค้างที่รูปเพื่อบันทึกแทนได้'); } });
       if (cp) cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(text); toast('success', 'คัดลอกข้อความสรุปแล้ว'); } catch (e) { toast('error', 'คัดลอกไม่สำเร็จ'); } });
     }
   });
@@ -1644,7 +1693,7 @@ function openReportViewer(url, rec, { justSaved = false, queued = false } = {}) 
     ? '<b style="color:var(--warn)">ยังไม่มีสัญญาณ — เก็บรายการไว้ในเครื่องแล้ว ระบบจะส่งขึ้น Google Sheets ให้อัตโนมัติเมื่อออนไลน์</b>'
     : 'ไฟล์ใบรายงานถูกเก็บไว้ใน "ประวัติการตรวจย้อนหลัง" แล้ว'}</div>` : '';
   return openImageViewer({
-    url, headHtml: head, fileName: reportFileName(rec), shareTitle: 'ใบรายงานการตรวจร้านค้า', text: reportText(rec),
+    url, headHtml: head, fileName: reportFileName(rec), text: reportText(rec),
     title: justSaved ? (queued ? '📥 เก็บไว้รอส่ง' : '✅ บันทึกข้อมูลสำเร็จ') : 'ใบรายงานการตรวจ',
     driveLink: rec.ReportURL && /^https?:/.test(rec.ReportURL) ? fullImageUrl(rec.ReportURL) : '',
     confirmText: justSaved ? 'บันทึกรายการถัดไป' : 'ปิด', denyText: justSaved ? 'ไปที่แดชบอร์ด' : ''
@@ -1717,7 +1766,7 @@ function renderDetail(rec) {
         <span class="check-dot">${icon(rec._ok ? 'check' : 'hourglass')}</span>
         <span><span class="block font-bold">${rec._ok ? 'ยืนยันจุดตรวจแล้ว' : 'รอยืนยันจุดตรวจ'}</span><span class="block text-sm muted">สถานะ: ${escapeHtml(rec.Status || STATUS_PENDING)}</span></span>
       </div>
-      <button type="button" class="btn btn-lg w-full" id="detailReportBig" style="background:#06c755;color:#fff">${icon('file')}ใบรายงาน LINE (ดู / บันทึก / ส่ง)</button>
+      <button type="button" class="btn btn-lg w-full" id="detailReportBig" style="background:#06c755;color:#fff">${icon('file')}ใบรายงานการตรวจ (ดู / บันทึก)</button>
     </div>
     </div>
   </div>`;
@@ -1789,6 +1838,7 @@ function addLocalRecord(rec) {
   mergeRecords();
 }
 function updateStoreDatalist() {
+  if (!$('#storeList')) return;   // หน้าที่ไม่มีฟอร์ม (แอปแดชบอร์ด) ไม่มีรายการช่วยพิมพ์
   const names = [...new Set(state.records.map(r => r.StoreName.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
   $('#storeList').innerHTML = names.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
   const uniq = (baseArr, key) => [...new Set(baseArr.concat(state.records.map(r => r[key])).map(v => String(v || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
@@ -1962,7 +2012,7 @@ async function initBranding() {
   ]);
   if (touch180) setHeadLink('apple-touch-icon', touch180, { sizes: '180x180' });
   if (png192) setHeadLink('icon', png192, { sizes: '192x192', type: 'image/png' });
-  BRAND_PNG = png192; // ใช้วาดโลโก้บนใบรายงาน LINE
+  BRAND_PNG = png192; // ใช้วาดโลโก้บนใบรายงาน
   // Manifest สร้างตอนรันไทม์ (Blob) → กด "ติดตั้งแอป / เพิ่มไปยังหน้าจอหลัก" แล้วได้ชื่อ+ไอคอนของแอปเอง
   // ข้ามเมื่อเปิดผ่าน Apps Script (หน้าเว็บอยู่ใน iframe ของ Google) หรือเปิดจาก file:// ซึ่งติดตั้งไม่ได้อยู่แล้ว
   if (state.mode !== 'gas' && /^https?:$/.test(location.protocol) && png192 && png512) {
@@ -2066,7 +2116,13 @@ function onAppEntered() {
    ============================================================================= */
 function showView(name) {
   state.view = name;
-  ['form', 'detail', 'dashboard'].forEach(v => { const el = $(`#view-${v}`); el.hidden = v !== name; if (v === name) { el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); } });
+  // บางแอปไม่มีทุกหน้า (แอปแดชบอร์ดไม่มีหน้าบันทึก) จึงต้องตรวจก่อนทุกครั้ง
+  ['form', 'detail', 'dashboard'].forEach(v => {
+    const el = $(`#view-${v}`); if (!el) return;
+    el.hidden = v !== name;
+    if (v === name) { el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+  });
+  if (!$(`#view-${name}`)) { state.view = 'dashboard'; const d = $('#view-dashboard'); if (d) d.hidden = false; }
   const navKey = name === 'detail' ? 'dashboard' : name;
   $$('[data-nav]').forEach(b => b.classList.toggle('active', b.dataset.nav === navKey));
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
@@ -2126,9 +2182,9 @@ function handleEvents() {
   $('#fInspector').addEventListener('change', () => { syncInspectorOther(); if ($('#fInspector').value === OTHER_INSPECTOR) $('#fInspectorOther').focus(); });
   $('#fFloor').addEventListener('change', () => { syncFloorOther(); if ($('#fFloor').value === OTHER_INSPECTOR) $('#fFloorOther').focus(); });
   $('#fShift').addEventListener('change', () => renderShiftOptions());
-  $('#detailReportBtn').addEventListener('click', () => { if (state.currentDetail) openRecordReport(state.currentDetail); });
   $('#btnSubmit').addEventListener('click', handleSubmit);
   // Detail
+  $('#detailReportBtn').addEventListener('click', () => { if (state.currentDetail) openRecordReport(state.currentDetail); });
   $('#detailBackBtn').addEventListener('click', () => showView('dashboard'));
   $('#detailDeleteBtn').addEventListener('click', handleDeleteRecord);
   $('#detailPrintBtn').addEventListener('click', printSlip);
