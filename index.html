@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ============================================================================
-   SBK Store Inspect — ระบบบันทึกการตรวจร้านค้า & แดชบอร์ดสรุปผล   SCI_Form_v12.html v12.0 — แอปฟอร์มบันทึกการตรวจ (เบา เปิดเร็ว) · โทนเขียวมรกต
+   SBK Store Inspect — ระบบบันทึกการตรวจร้านค้า & แดชบอร์ดสรุปผล   SCI_Form_v13.html v13.0 — แอปฟอร์มบันทึกการตรวจ (เบา เปิดเร็ว) · โทนเขียวมรกต
    v4.0: แดชบอร์ดโฉมใหม่ 3 แท็บ (ภาพรวม / รายงานรายวัน / ประวัติ), รายงานประจำวัน (LINE + A4),
          เชื่อมต่อทนทานขึ้น (retry, fetch→JSONP สำรอง, แคช, Outbox ออฟไลน์, รีเฟรชอัตโนมัติ)
    v3.0: รายชื่อผู้ตรวจ, ชั้น/โซน, ตัด GPS, ฝัง URL Web App, ใบรายงาน LINE (ดูตัวอย่างก่อนบันทึก,
@@ -262,7 +262,9 @@ html[data-theme="dark"] .brand-title{background:linear-gradient(90deg,#5eead4,#7
 @media (min-width:1700px){ .app-container{padding-left:3rem;padding-right:3rem} }
 
 /* แถบเลือกช่วงเวลาในแถบหัว (โทนกระจกให้อ่านง่ายบนพื้นไล่สี) */
-.hero-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-top:1rem;color:#fff}
+.hero-tabsrow{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.6rem;margin-top:1.1rem}
+.hero-tabsrow .dash-tabs{margin-top:0;flex:0 0 auto}
+.hero-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;color:#fff;margin-left:auto;padding-bottom:.45rem}
 .hero-bar .btn-glass{padding:.5rem .9rem}
 .seg-hero{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28)}
 .seg-hero button{color:rgba(255,255,255,.85)}
@@ -271,7 +273,7 @@ html[data-theme="dark"] .brand-title{background:linear-gradient(90deg,#5eead4,#7
 html[data-theme="dark"] .seg.seg-hero button.active{background:#f1f5f9;color:#111827}
 .icon-btn-hero{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.3);color:#fff}
 .icon-btn-hero:hover{background:rgba(255,255,255,.28);border-color:rgba(255,255,255,.45);color:#fff}
-@media (min-width:1024px){ .hero-bar{margin-top:1.1rem} .hero-bar > div:last-child{margin-left:auto} }
+@media (max-width:1180px){ .hero-bar{margin-left:0;width:100%;padding-bottom:.6rem} .hero-tabsrow{align-items:stretch;flex-direction:column-reverse} .hero-tabsrow .dash-tabs{width:100%} }
 @media (max-width:640px){
   .hero-bar{gap:.5rem}
   #periodSeg{display:grid;grid-template-columns:repeat(4,1fr);width:100%}
