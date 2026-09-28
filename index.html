@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ============================================================================
-   SBK Store Inspect — ระบบบันทึกการตรวจร้านค้า & แดชบอร์ดสรุปผล   SCI_Form_v13.html v13.0 — แอปฟอร์มบันทึกการตรวจ (เบา เปิดเร็ว) · โทนเขียวมรกต
+   SBK Store Inspect — ระบบบันทึกการตรวจร้านค้า & แดชบอร์ดสรุปผล   SCI_Form_v14.html v14.0 — แอปฟอร์มบันทึกการตรวจ (เบา เปิดเร็ว) · โทนเขียวมรกต
    v4.0: แดชบอร์ดโฉมใหม่ 3 แท็บ (ภาพรวม / รายงานรายวัน / ประวัติ), รายงานประจำวัน (LINE + A4),
          เชื่อมต่อทนทานขึ้น (retry, fetch→JSONP สำรอง, แคช, Outbox ออฟไลน์, รีเฟรชอัตโนมัติ)
    v3.0: รายชื่อผู้ตรวจ, ชั้น/โซน, ตัด GPS, ฝัง URL Web App, ใบรายงาน LINE (ดูตัวอย่างก่อนบันทึก,
@@ -281,6 +281,15 @@ html[data-theme="dark"] .seg.seg-hero button.active{background:#f1f5f9;color:#11
   .hero-bar #periodLabel{min-width:0;flex:1;font-size:.92rem}
 }
 
+/* ตารางเปรียบเทียบข้ามช่วง */
+.cmp-table{width:100%}
+.cmp-table th{position:sticky;top:0}
+.cmp-table tbody tr{cursor:default}
+.cmp-up{color:var(--ok);font-weight:700}
+.cmp-down{color:var(--danger);font-weight:700}
+.cmp-flat{color:var(--muted);font-weight:600}
+.cmp-table small{font-weight:600;opacity:.85}
+
 /* Toast */
 #toastBox{position:fixed;top:calc(env(safe-area-inset-top,0px) + .8rem);right:.8rem;z-index:3500;display:flex;flex-direction:column;gap:.5rem;pointer-events:none;width:min(92vw,380px)}
 @media (max-width:640px){#toastBox{left:50%;right:auto;transform:translateX(-50%)}}
@@ -557,7 +566,6 @@ html[data-theme="dark"]{--primary:#34d399;--primary-600:#6ee7b7;--primary-soft:#
         </div>
         <div class="flex gap-2">
           <button class="btn btn-glass" id="btnRefresh" title="รีเฟรชข้อมูล"><span data-icon="refresh"></span><span class="hidden sm:inline">รีเฟรช</span></button>
-          <a class="btn btn-white" id="btnOpenDashboard" target="_blank" rel="noopener" hidden><span data-icon="chart"></span>แดชบอร์ดสรุปผล</a>
         </div>
       </div>
     </div>
@@ -624,8 +632,7 @@ const CONFIG = {
   IMAGE_MAX_SIDE: 1280,         // ย่อรูปฝั่งเครื่องก่อนส่ง → ไฟล์ ~150–400KB ไม่เกิน payload limit ของ Apps Script
   IMAGE_QUALITY: 0.75,
   APP_NAME: 'Store Checkpoint Inspection Form',
-  APP_ROLE: 'form',             // ไฟล์นี้คือแอปฟอร์มบันทึก — ดูสรุปผลเต็มรูปแบบได้ที่แอปแดชบอร์ด
-  DASHBOARD_URL: '',            // เว้นว่าง = ระบบเดาลิงก์แดชบอร์ดให้เอง (…/exec?app=dashboard)
+  APP_ROLE: 'form',             // ไฟล์นี้คือแอปฟอร์มบันทึก (ไม่มีหน้าสรุปผล/ลิงก์ไปแดชบอร์ด)
   ALLOW_GALLERY: false,   // แอปฟอร์มหน้างาน: ถ่ายจากกล้องเท่านั้น เพื่อยืนยันว่าตรวจ ณ จุดจริง          // true = เลือกรูปจากเครื่องได้ด้วย · false = ถ่ายจากกล้องเท่านั้น (ใช้กับแอปฟอร์มหน้างาน)
   APP_SHORT_NAME: 'Checkpoint Form',
   SPLASH_MS: 3000,              // หน้าโลโก้ตอนเปิดแอป แล้วเข้าสู่ระบบอัตโนมัติ (กำหนดได้ 2000–4000 ms)
@@ -1958,18 +1965,6 @@ async function autoRefresh() {
   try { const m = await API.meta(); if (m.stamp && m.stamp !== state.metaStamp) { state.metaStamp = m.stamp; loadData({ silent: true }); } }
   catch (e) { /* ครั้งหน้าลองใหม่ */ }
 }
-/** ลิงก์ไปแอปแดชบอร์ด: ใช้ค่าที่ตั้งไว้ ถ้าไม่ได้ตั้งจะเดาจาก URL ของ Web App ให้เอง */
-function wireDashboardLink() {
-  const a = $('#btnOpenDashboard'); if (!a) return;
-  const setUrl = u => { if (u) { a.href = u; a.hidden = false; } else a.hidden = true; };
-  if (CONFIG.DASHBOARD_URL.trim()) return setUrl(CONFIG.DASHBOARD_URL.trim());
-  if (state.mode === 'api') return setUrl(CONFIG.API_URL.trim() + '?app=dashboard');
-  if (state.mode === 'gas') {
-    gasCall('apiWebAppUrl').then(r => setUrl(r && r.ok ? r.url + '?app=dashboard' : '')).catch(() => setUrl(''));
-    return;
-  }
-  setUrl('');
-}
 
 /* =============================================================================
    11) EXPORT & PRINT
@@ -1983,6 +1978,21 @@ function printHeader(title, sub, docNo) {
   return `<div class="pr-head"><div style="display:flex;align-items:center"><img src="${LOGO_URL}" alt=""><div><div class="pr-sub">${escapeHtml(CONFIG.ORG_NAME)} · ${escapeHtml(CONFIG.DEPT_NAME)}</div><h1>${escapeHtml(title)}</h1><div class="pr-sub">${sub}</div></div></div>
     <div class="pr-sub" style="text-align:right">${docNo ? `เลขที่เอกสาร <b>${escapeHtml(docNo)}</b><br>` : ''}พิมพ์เมื่อ ${fmtThaiLong(now)}<br>เวลา ${fmtHMS(now)} น.</div></div>`;
 }
+/** ตารางเปรียบเทียบกับช่วงก่อนหน้า สำหรับรายงาน A4 */
+function comparePrintTable() {
+  const C = comparePeriods();
+  const fmtDiff = r => !r.diff ? 'เท่าเดิม'
+    : `${r.diff > 0 ? '+' : '−'}${Math.abs(r.diff).toFixed(r.digits || 0)}${r.pct === null ? ' (ใหม่)' : ` (${r.diff > 0 ? '+' : '−'}${Math.abs(r.pct).toFixed(0)}%)`}`;
+  return `<div style="font-weight:700;color:#0d9488;margin:6px 0 4px">เปรียบเทียบกับช่วงก่อนหน้า</div>
+    <table class="pr-table" style="margin-bottom:10px"><thead><tr>
+      <th>ตัวชี้วัด</th><th style="width:18%;text-align:right">${escapeHtml(C.curRg.label)}</th>
+      <th style="width:18%;text-align:right">${escapeHtml(C.prevRg.label)}</th><th style="width:18%;text-align:right">เปลี่ยนแปลง</th></tr></thead>
+    <tbody>${C.rows.map(r => `<tr><td>${r.label} (${r.unit})</td>
+      <td style="text-align:right">${r.digits ? r.cur.toFixed(r.digits) : nf(r.cur)}</td>
+      <td style="text-align:right">${r.digits ? r.prev.toFixed(r.digits) : nf(r.prev)}</td>
+      <td style="text-align:right">${fmtDiff(r)}</td></tr>`).join('')}</tbody></table>`;
+}
+
 /** บทสรุปผู้บริหาร: สร้างจากข้อมูลจริงล้วน ไม่ใช่ข้อความสำเร็จรูป */
 async function waitImages(root, timeout = 6000) {
   const imgs = $$('img', root).filter(i => !i.complete);
@@ -2273,7 +2283,6 @@ function init() {
   // แอปแดชบอร์ดเปิดที่หน้าสรุปเสมอ — หน้าบันทึกยังมีอยู่แต่ซ่อนเมนูไว้ (เข้าถึงด้วย #form)
   const wantForm = /form/i.test(location.hash || '');
   showView(CONFIG.APP_ROLE === 'dashboard' && !wantForm ? 'dashboard' : 'form');
-  wireDashboardLink();
   Outbox.refresh().then(() => { mergeRecords(); Outbox.flush(); }); // มีรายการค้างจากครั้งก่อน → ส่งต่อให้
   loadData({ silent: true });    // โหลดล่วงหน้าเพื่อเติมรายชื่อร้านค้าใน datalist
   setInterval(autoRefresh, 60000);                       // มีข้อมูลใหม่จากเครื่องอื่น → รายการล่าสุดอัปเดตเอง
